@@ -17,11 +17,11 @@ function setActiveNavItem() {
         link.classList.remove('active');
     });
     
-    if (path.endsWith('index.html') || path.endsWith('/')) {
+    if (path === '/') {
         document.getElementById('nav-home').classList.add('active');
-    } else if (path.includes('search.html')) {
+    } else if (path.includes('/search')) {
         document.getElementById('nav-search').classList.add('active');
-    } else if (path.includes('dashboard.html')) {
+    } else if (path.includes('/dashboard')) {
         document.getElementById('nav-dashboard').classList.add('active');
     }
 }
@@ -29,32 +29,13 @@ function setActiveNavItem() {
 // Check if user is logged in
 async function checkAuth() {
     try {
-        const session = CookieUtil.getCookie(CONFIG.SESSION_COOKIE_NAME);
-        
-        if (session) {
-            // Try to fetch user info
-            const response = await fetch(`${CONFIG.API_URL}/api/user`, {
-                headers: {
-                    'Cookie': `ci_session=${session}`
-                },
-                credentials: 'include'
+        const response = await fetch('/api/user');
+        if (response.ok) {
+            currentUser = await response.json();
+            renderAuthSection();
+            document.querySelectorAll('.user-only').forEach(el => {
+                el.style.display = 'block';
             });
-            
-            if (response.ok) {
-                currentUser = await response.json();
-                renderAuthSection();
-                document.querySelectorAll('.user-only').forEach(el => {
-                    el.style.display = 'block';
-                });
-            } else {
-                // Session is invalid
-                CookieUtil.deleteCookie(CONFIG.SESSION_COOKIE_NAME);
-                currentUser = null;
-                renderAuthSection();
-                document.querySelectorAll('.user-only').forEach(el => {
-                    el.style.display = 'none';
-                });
-            }
         } else {
             currentUser = null;
             renderAuthSection();
@@ -83,7 +64,7 @@ function renderAuthSection() {
                     <i class="fas fa-user me-1"></i> ${currentUser.name}
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                    <li><a class="dropdown-item" href="dashboard.html"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
+                    <li><a class="dropdown-item" href="/dashboard"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><button id="logout-btn" class="dropdown-item"><i class="fas fa-sign-out-alt me-2"></i>Logout</button></li>
                 </ul>
@@ -124,7 +105,7 @@ async function handleLogin(e) {
     formData.append('password', password);
     
     try {
-        const response = await fetch(`${CONFIG.API_URL}/api/login`, {
+        const response = await fetch('/api/login', {
             method: 'POST',
             body: formData
         });
@@ -133,9 +114,6 @@ async function handleLogin(e) {
             const data = await response.json();
             if (data.success) {
                 loginError.style.display = 'none';
-                
-                // Store the session
-                CookieUtil.setCookie(CONFIG.SESSION_COOKIE_NAME, data.session, CONFIG.SESSION_DURATION_DAYS);
                 
                 // Close the modal
                 bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();
@@ -171,9 +149,7 @@ async function handleLogin(e) {
 // Handle logout
 async function logout() {
     try {
-        // Delete the session cookie
-        CookieUtil.deleteCookie(CONFIG.SESSION_COOKIE_NAME);
-        
+        await fetch('/api/logout', { method: 'POST' });
         currentUser = null;
         renderAuthSection();
         document.querySelectorAll('.user-only').forEach(el => {
@@ -184,8 +160,8 @@ async function logout() {
         showToast('Logged out', 'You have been successfully logged out', 'info');
         
         // Redirect to home if on dashboard
-        if (window.location.pathname.includes('dashboard.html')) {
-            window.location.href = 'index.html';
+        if (window.location.pathname.includes('/dashboard')) {
+            window.location.href = '/';
         }
     } catch (error) {
         console.error('Logout error:', error);
@@ -201,7 +177,7 @@ async function fetchPools() {
         poolsLoading.style.display = 'block';
         poolsContainer.innerHTML = '';
         
-        const response = await fetch(`${CONFIG.API_URL}/api/pools`);
+        const response = await fetch('/api/pools');
         pools = await response.json();
         
         poolsLoading.style.display = 'none';
@@ -240,7 +216,7 @@ function renderPools() {
         <div class="col-md-4 mb-4 fade-in" style="animation-delay: ${index * 0.1}s">
             <div class="card pool-card h-100">
                 <div class="position-relative">
-                    <img src="${pool.image_url || 'images/pool-placeholder.jpg'}" class="card-img-top" alt="${pool.name}">
+                    <img src="${pool.image_url || '/static/images/pool-placeholder.jpg'}" class="card-img-top" alt="${pool.name}">
                     <div class="position-absolute top-0 end-0 m-2">
                         <span class="badge bg-primary">Pool #${pool.id}</span>
                     </div>
@@ -257,7 +233,7 @@ function renderPools() {
                         <button class="btn btn-outline-primary view-details" data-pool-id="${pool.id}">
                             <i class="fas fa-info-circle me-1"></i> Details
                         </button>
-                        <a href="search.html?pool_id=${pool.id}" class="btn btn-primary">
+                        <a href="/search?pool_id=${pool.id}" class="btn btn-primary">
                             <i class="fas fa-calendar-check me-1"></i> Book Now
                         </a>
                     </div>
@@ -277,18 +253,18 @@ async function showPoolDetails(poolId) {
     try {
         // Show loading state
         document.getElementById('poolDetailsTitle').textContent = 'Loading...';
-        document.getElementById('poolDetailsImage').src = 'images/pool-placeholder.jpg';
+        document.getElementById('poolDetailsImage').src = '/static/images/pool-placeholder.jpg';
         document.getElementById('poolDetailsAddress').textContent = 'Loading...';
         document.getElementById('googleMap').innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary"></div></div>';
         
         const poolDetailsModal = new bootstrap.Modal(document.getElementById('poolDetailsModal'));
         poolDetailsModal.show();
         
-        const response = await fetch(`${CONFIG.API_URL}/api/pool/${poolId}`);
+        const response = await fetch(`/api/pool/${poolId}`);
         const pool = await response.json();
         
         document.getElementById('poolDetailsTitle').textContent = pool.name;
-        document.getElementById('poolDetailsImage').src = pool.image_url || 'images/pool-placeholder.jpg';
+        document.getElementById('poolDetailsImage').src = pool.image_url || '/static/images/pool-placeholder.jpg';
         document.getElementById('poolDetailsAddress').textContent = pool.address;
         
         // Set up Google Map iframe if available
@@ -301,7 +277,7 @@ async function showPoolDetails(poolId) {
         
         // Set up check availability button
         const checkAvailabilityBtn = document.getElementById('checkAvailabilityBtn');
-        checkAvailabilityBtn.href = `search.html?pool_id=${poolId}`;
+        checkAvailabilityBtn.href = `/search?pool_id=${poolId}`;
     } catch (error) {
         console.error('Error fetching pool details:', error);
         const poolDetailsModal = bootstrap.Modal.getInstance(document.getElementById('poolDetailsModal'));
@@ -310,8 +286,8 @@ async function showPoolDetails(poolId) {
     }
 }
 
-// Show toast notification
-function showToast(title, message, type = 'info') {
+// Global showToast function
+window.showToast = function(title, message, type = 'info') {
     // Create toast container if it doesn't exist
     let toastContainer = document.querySelector('.toast-container');
     if (!toastContainer) {
@@ -368,7 +344,7 @@ function showToast(title, message, type = 'info') {
     toast.addEventListener('hidden.bs.toast', () => {
         toast.remove();
     });
-}
+};
 
 // Set current year in footer
 function setCurrentYear() {
@@ -377,36 +353,11 @@ function setCurrentYear() {
     }
 }
 
-// Back to top button functionality
-function initBackToTop() {
-    const backToTopButton = document.getElementById('back-to-top');
-    if (!backToTopButton) return;
-    
-    window.addEventListener('scroll', function() {
-        if (window.pageYOffset > 300) {
-            backToTopButton.classList.add('show');
-        } else {
-            backToTopButton.classList.remove('show');
-        }
-    });
-    
-    backToTopButton.addEventListener('click', function() {
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-        });
-    });
-}
-
-// Make showToast available globally
-window.showToast = showToast;
-
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
     setActiveNavItem();
     checkAuth();
     setCurrentYear();
-    initBackToTop();
     
     if (loginForm) {
         loginForm.addEventListener('submit', handleLogin);

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - PCMC Swimming Pools{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>My Dashboard</h1>
+            <div>
+                <span class="badge bg-primary fs-6" id="user-name"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">My Bookings</h5>
+            </div>
+            <div class="card-body">
+                <!-- Filter & Sort Options -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <select id="status-filter" class="form-select me-2">
+                                <option value="">All Status</option>
+                                <!-- Options will be loaded dynamically -->
+                            </select>
+                            <button id="apply-filter" class="btn btn-outline-primary">Apply</button>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-secondary" id="sort-date-asc">
+                                <i class="fas fa-sort-amount-up-alt me-1"></i> Date
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="sort-date-desc">
+                                <i class="fas fa-sort-amount-down me-1"></i> Date
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="bookings-loading" class="text-center my-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+
+                <!-- No Bookings Message -->
+                <div id="no-bookings-message" class="alert alert-info" style="display: none;">
+                    You don't have any bookings yet.
+                </div>
+
+                <!-- Bookings Table -->
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Booking Number</th>
+                                <th>Swimming Pool</th>
+                                <th>Batch</th>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Payment</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bookings-table-body">
+                            <!-- Bookings will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div id="pagination-container" class="d-flex justify-content-center mt-4">
+                    <nav aria-label="Bookings pagination">
+                        <ul class="pagination" id="pagination">
+                            <!-- Pagination will be loaded here -->
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Receipt Modal -->
+<div class="modal fade" id="receiptModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Receipt</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="ratio ratio-1x1">
+                    <iframe id="receipt-iframe" src="" allowfullscreen></iframe>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a id="download-receipt" href="#" class="btn btn-primary" download>
+                    <i class="fas fa-download me-1"></i> Download PDF
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}

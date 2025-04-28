@@ -1,3 +1,4 @@
+// dashboard.js
 // Dashboard functionality
 let currentFilter = '';
 let currentSortField = '';
@@ -21,17 +22,10 @@ async function fetchBookings() {
     try {
         showLoading(true);
         
-        // Check if user is logged in
-        const session = CookieUtil.getCookie(CONFIG.SESSION_COOKIE_NAME);
-        if (!session) {
-            window.location.href = 'index.html';
-            return;
-        }
-        
         // Debug
         console.log('Fetching bookings...');
         
-        let url = `${CONFIG.API_URL}/api/bookings?page=${currentPage}`;
+        let url = `/api/bookings?page=${currentPage}`;
         if (currentFilter) {
             url += `&status=${currentFilter}`;
         }
@@ -41,13 +35,7 @@ async function fetchBookings() {
         
         console.log('Fetch URL:', url);
         
-        const response = await fetch(url, {
-            headers: {
-                'Cookie': `ci_session=${session}`
-            },
-            credentials: 'include'
-        });
-        
+        const response = await fetch(url);
         console.log('Response status:', response.status);
         
         if (!response.ok) {
@@ -66,13 +54,7 @@ async function fetchBookings() {
         
         // Update user name
         if (userNameElement) {
-            const userResponse = await fetch(`${CONFIG.API_URL}/api/user`, {
-                headers: {
-                    'Cookie': `ci_session=${session}`
-                },
-                credentials: 'include'
-            });
-            
+            const userResponse = await fetch('/api/user');
             if (userResponse.ok) {
                 const userData = await userResponse.json();
                 userNameElement.textContent = userData.name;
@@ -153,7 +135,7 @@ function renderBookings(bookings) {
                         <button class="btn btn-sm btn-success view-receipt" data-receipt-id="${booking.receipt_id}">
                             <i class="fas fa-eye me-1"></i> View
                         </button>
-                        <a href="${CONFIG.API_URL}/api/receipt/${booking.receipt_id}" class="btn btn-sm btn-outline-success" download="receipt_${booking.receipt_id}.pdf">
+                        <a href="/api/receipt/${booking.receipt_id}" class="btn btn-sm btn-outline-success" download="receipt_${booking.receipt_id}.pdf">
                             <i class="fas fa-download"></i>
                         </a>
                     </div>` : 
@@ -298,8 +280,7 @@ function viewReceipt(receiptId) {
     `;
     
     // Set the receipt URL
-    const session = CookieUtil.getCookie(CONFIG.SESSION_COOKIE_NAME);
-    const receiptUrl = `${CONFIG.API_URL}/api/receipt/${receiptId}`;
+    const receiptUrl = `/api/receipt/${receiptId}`;
     
     // Set the download link
     downloadReceiptLink.href = receiptUrl;
@@ -309,44 +290,38 @@ function viewReceipt(receiptId) {
     receiptModal.show();
     
     // Check if the receipt is available
-    fetch(receiptUrl, { 
-        method: 'HEAD',
-        headers: {
-            'Cookie': `ci_session=${session}`
-        },
-        credentials: 'include'
-    })
-    .then(response => {
-        if (response.ok) {
-            // Set the iframe source after confirming the receipt is available
-            receiptIframe.src = receiptUrl;
-        } else {
-            // Show error message in the iframe
+    fetch(receiptUrl, { method: 'HEAD' })
+        .then(response => {
+            if (response.ok) {
+                // Set the iframe source after confirming the receipt is available
+                receiptIframe.src = receiptUrl;
+            } else {
+                // Show error message in the iframe
+                receiptIframe.srcdoc = `
+                    <html>
+                        <body style="display: flex; justify-content: center; align-items: center; height: 100%; margin: 0; font-family: Arial, sans-serif;">
+                            <div style="text-align: center; color: #721c24; background-color: #f8d7da; padding: 20px; border-radius: 5px;">
+                                <h3>Error Loading Receipt</h3>
+                                <p>The receipt could not be loaded. Please try downloading it directly.</p>
+                            </div>
+                        </body>
+                    </html>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error checking receipt:', error);
             receiptIframe.srcdoc = `
                 <html>
                     <body style="display: flex; justify-content: center; align-items: center; height: 100%; margin: 0; font-family: Arial, sans-serif;">
                         <div style="text-align: center; color: #721c24; background-color: #f8d7da; padding: 20px; border-radius: 5px;">
-                            <h3>Error Loading Receipt</h3>
-                            <p>The receipt could not be loaded. Please try downloading it directly.</p>
+                            <h3>Error</h3>
+                            <p>An error occurred while checking the receipt. Please try downloading it directly.</p>
                         </div>
                     </body>
                 </html>
             `;
-        }
-    })
-    .catch(error => {
-        console.error('Error checking receipt:', error);
-        receiptIframe.srcdoc = `
-            <html>
-                <body style="display: flex; justify-content: center; align-items: center; height: 100%; margin: 0; font-family: Arial, sans-serif;">
-                    <div style="text-align: center; color: #721c24; background-color: #f8d7da; padding: 20px; border-radius: 5px;">
-                        <h3>Error</h3>
-                        <p>An error occurred while checking the receipt. Please try downloading it directly.</p>
-                    </div>
-                </body>
-            </html>
-        `;
-    });
+        });
 }
 
 // Show/hide loading indicator
@@ -356,20 +331,9 @@ function showLoading(isLoading) {
     }
 }
 
-// Check if user is logged in and redirect if not
-function checkUserLoggedIn() {
-    const session = CookieUtil.getCookie(CONFIG.SESSION_COOKIE_NAME);
-    if (!session) {
-        window.location.href = 'index.html';
-    }
-}
-
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Dashboard page loaded');
-    
-    // Check if user is logged in
-    checkUserLoggedIn();
     
     // Check if we're on the dashboard page
     if (document.getElementById('bookings-table-body')) {

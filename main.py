@@ -1,6 +1,8 @@
+# main.py
 from fastapi import FastAPI, Request, Response, Form, Cookie, HTTPException, Depends, Query
-from fastapi.responses import StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from typing import Optional, List, Dict, Any
 import httpx
 import bs4
@@ -8,19 +10,12 @@ from pydantic import BaseModel
 import json
 from datetime import datetime, timedelta
 import io
-import asyncio
-import threading
 
-app = FastAPI(title="PCMC Swimming Pool Proxy API")
+app = FastAPI(title="PCMC Swimming Pool Proxy")
 
-# Add CORS middleware to allow requests from GitHub Pages
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # For development, in production specify your GitHub Pages URL
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 # Base URL for the original website
 BASE_URL = "https://pcmc.h2otechno.in"
@@ -58,31 +53,8 @@ class Booking(BaseModel):
     booking_status: str
     receipt_id: Optional[str] = None
 
-# Keep-alive mechanism
-async def keep_alive():
-    """Ping the health endpoint every 10 seconds to keep the service alive on Render."""
-    while True:
-        await asyncio.sleep(10)
-        try:
-            async with httpx.AsyncClient() as client:
-                # Use the actual URL of your deployed app
-                response = await client.get("https://pcmc-pool.onrender.com")
-                print(f"Keep-alive ping: {response.status_code}")
-        except Exception as e:
-            print(f"Keep-alive error: {e}")
-
-# Start the keep-alive task
-@app.on_event("startup")
-async def startup_event():
-    asyncio.create_task(keep_alive())
-
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
-
 # Helper function to check if user is logged in
-async def validate_session(ci_session: str):
+async def get_current_user(ci_session: Optional[str] = Cookie(None)):
     if not ci_session:
         return None
     
@@ -103,9 +75,34 @@ async def validate_session(ci_session: str):
     return None
 
 # Routes
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request, user: Optional[User] = Depends(get_current_user)):
+    return templates.TemplateResponse("index.html", {"request": request, "user": user})
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page(
+    request: Request, 
+    user: Optional[User] = Depends(get_current_user),
+    status: Optional[str] = Query(None),
+    sortField: Optional[str] = Query(None),
+    sortOrder: Optional[str] = Query(None),
+    page: int = Query(1)
+):
+    if not user:
+        return RedirectResponse(url="/")
+    
+    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user})
+
+@app.get("/search", response_class=HTMLResponse)
+async def search_page(
+    request: Request, 
+    user: Optional[User] = Depends(get_current_user),
+    pool_id: Optional[int] = Query(None)
+):
+    return templates.TemplateResponse("search.html", {"request": request, "user": user, "pool_id": pool_id})
+
 @app.get("/api/user")
-async def get_user(ci_session: Optional[str] = Cookie(None)):
-    user = await validate_session(ci_session)
+async def get_user(user: Optional[User] = Depends(get_current_user)):
     if user:
         return user
     raise HTTPException(status_code=401, detail="Not authenticated")
@@ -190,7 +187,7 @@ async def get_pool_details(pool_id: int, ci_session: Optional[str] = Cookie(None
     }
 
 @app.post("/api/login")
-async def login(email_or_aadhar: str = Form(...), password: str = Form(...)):
+async def login(response: Response, email_or_aadhar: str = Form(...), password: str = Form(...)):
     try:
         # First, get a session cookie by visiting the login page
         login_page_response = await client.get(f"{BASE_URL}/index.php/user/login")
@@ -235,11 +232,15 @@ async def login(email_or_aadhar: str = Form(...), password: str = Form(...)):
             new_session = login_response.cookies.get("ci_session")
             
             if new_session:
-                # Return the session cookie to the client
-                return {
-                    "success": True,
-                    "session": new_session
-                }
+                # Set the cookie in our response
+                response.set_cookie(
+                    key="ci_session",
+                    value=new_session,
+                    httponly=True,
+                    max_age=3600,  # 1 hour
+                    path="/"
+                )
+                return {"success": True}
             
         # If we get here, check if we need to verify the login was successful
         verify_headers = {"Cookie": f"ci_session={login_response.cookies.get('ci_session', initial_cookies)}"}
@@ -250,12 +251,15 @@ async def login(email_or_aadhar: str = Form(...), password: str = Form(...)):
         user_element = soup.select_one(".nm-title")
         
         if user_element:
-            # Login was successful, return the session cookie
-            return {
-                "success": True,
-                "session": login_response.cookies.get("ci_session", initial_cookies),
-                "user": user_element.text.strip()
-            }
+            # Login was successful, set the cookie
+            response.set_cookie(
+                key="ci_session",
+                value=login_response.cookies.get("ci_session", initial_cookies),
+                httponly=True,
+                max_age=3600,  # 1 hour
+                path="/"
+            )
+            return {"success": True, "user": user_element.text.strip()}
     
     except Exception as e:
         print(f"Login error: {str(e)}")
@@ -263,6 +267,11 @@ async def login(email_or_aadhar: str = Form(...), password: str = Form(...)):
     
     # If we get here, login failed
     raise HTTPException(status_code=401, detail="Invalid credentials")
+
+@app.post("/api/logout")
+async def logout(response: Response):
+    response.delete_cookie(key="ci_session")
+    return {"success": True}
 
 @app.post("/api/availability")
 async def check_availability(
@@ -515,7 +524,7 @@ async def get_receipt(receipt_id: str, ci_session: Optional[str] = Cookie(None))
     except Exception as e:
         print(f"Error fetching receipt: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching receipt: {str(e)}")
-
+    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -64,10 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
             themeToggleBtn.setAttribute('data-bs-placement', 'bottom');
         }
         
-        // Initialize tooltip if Bootstrap is loaded
-        if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
-            new bootstrap.Tooltip(themeToggleBtn);
-        }
+        // Initialize tooltip
+        new bootstrap.Tooltip(themeToggleBtn);
     }
     
     // Listen for system theme changes

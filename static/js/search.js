@@ -1,6 +1,6 @@
 // Search functionality
 let selectedPoolId = '';
-let currentUser = null;
+const minDate = new Date().toISOString().split('T')[0];  // Today's date
 
 // DOM elements
 const availabilityForm = document.getElementById('availability-form');
@@ -16,57 +16,22 @@ const resultsBatches = document.getElementById('results-batches');
 // Initialize the search page
 async function initSearchPage() {
     // Set minimum date to today
-    const today = new Date();
-    const formattedDate = today.toISOString().split('T')[0];
-    bookingDateInput.min = formattedDate;
-    bookingDateInput.value = formattedDate;
+    bookingDateInput.min = minDate;
+    bookingDateInput.value = minDate;
     
     // Load pools
     await loadPools();
     
-    // Set initial pool ID from URL parameter if provided
-    const urlParams = new URLSearchParams(window.location.search);
-    const poolIdParam = urlParams.get('pool_id');
-    
-    if (poolIdParam) {
-        poolSelect.value = poolIdParam;
-    }
-    
-    // Check if user is logged in
-    checkUserStatus();
-}
-
-// Check if user is logged in
-async function checkUserStatus() {
-    const session = CookieUtil.getCookie(CONFIG.SESSION_COOKIE_NAME);
-    
-    if (session) {
-        try {
-            const response = await fetch(`${CONFIG.API_URL}/api/user`, {
-                headers: {
-                    'Cookie': `ci_session=${session}`
-                },
-                credentials: 'include'
-            });
-            
-            if (response.ok) {
-                currentUser = await response.json();
-            } else {
-                currentUser = null;
-            }
-        } catch (error) {
-            console.error('Error checking user status:', error);
-            currentUser = null;
-        }
-    } else {
-        currentUser = null;
+    // Set initial pool ID if provided
+    if (typeof initialPoolId !== 'undefined' && initialPoolId) {
+        poolSelect.value = initialPoolId;
     }
 }
 
 // Load pools for the select dropdown
 async function loadPools() {
     try {
-        const response = await fetch(`${CONFIG.API_URL}/api/pools`);
+        const response = await fetch('/api/pools');
         const pools = await response.json();
         
         // Clear existing options except the first one
@@ -101,29 +66,25 @@ async function checkAvailability(e) {
     }
     
     // Check if user is logged in
-    const session = CookieUtil.getCookie(CONFIG.SESSION_COOKIE_NAME);
-    if (!session) {
-        // Show login required modal
-        const loginRequiredModal = new bootstrap.Modal(document.getElementById('loginRequiredModal'));
-        loginRequiredModal.show();
-        return;
-    }
-    
-    // User is logged in, proceed with availability check
-    showResults('loading');
-    
     try {
+        const userResponse = await fetch('/api/user');
+        if (!userResponse.ok) {
+            // Show login required modal
+            const loginRequiredModal = new bootstrap.Modal(document.getElementById('loginRequiredModal'));
+            loginRequiredModal.show();
+            return;
+        }
+        
+        // User is logged in, proceed with availability check
+        showResults('loading');
+        
         const formData = new FormData();
         formData.append('pool_id', selectedPoolId);
         formData.append('booking_date', bookingDate);
         
-        const response = await fetch(`${CONFIG.API_URL}/api/availability`, {
+        const response = await fetch('/api/availability', {
             method: 'POST',
-            body: formData,
-            headers: {
-                'Cookie': `ci_session=${session}`
-            },
-            credentials: 'include'
+            body: formData
         });
         
         if (!response.ok) {
@@ -136,7 +97,12 @@ async function checkAvailability(e) {
         const poolName = poolSelect.options[poolSelect.selectedIndex].text;
         
         // Format date for display
-        const formattedDate = new Date(bookingDate).toLocaleDateString('en-US', CONFIG.DATE_FORMAT);
+        const formattedDate = new Date(bookingDate).toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
         
         // Check if there are any batches
         if (data.message) {
@@ -210,15 +176,5 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (availabilityForm) {
         availabilityForm.addEventListener('submit', checkAvailability);
-    }
-    
-    // Handle login required button click
-    const loginRequiredBtn = document.getElementById('loginRequiredBtn');
-    if (loginRequiredBtn) {
-        loginRequiredBtn.addEventListener('click', () => {
-            bootstrap.Modal.getInstance(document.getElementById('loginRequiredModal')).hide();
-            const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
-            loginModal.show();
-        });
     }
 });
