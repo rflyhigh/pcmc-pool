@@ -525,6 +525,11 @@ async def get_receipt(receipt_id: str, ci_session: Optional[str] = Cookie(None))
         print(f"Error fetching receipt: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching receipt: {str(e)}")
     
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
