@@ -66,7 +66,7 @@ async def keep_alive():
         try:
             async with httpx.AsyncClient() as client:
                 # Use the actual URL of your deployed app
-                response = await client.get("https://your-app-name.onrender.com/health")
+                response = await client.get("https://pcmc-pool.onrender.com")
                 print(f"Keep-alive ping: {response.status_code}")
         except Exception as e:
             print(f"Keep-alive error: {e}")

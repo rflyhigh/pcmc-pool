@@ -1,7 +1,7 @@
 // Configuration file for the PCMC Swimming Pool Proxy
 const CONFIG = {
     // API base URL - change this to your Render deployment URL
-    API_URL: "https://your-backend-app.onrender.com",
+    API_URL: "https://pcmc-pool.onrender.com",
     
     // Session cookie name
     SESSION_COOKIE_NAME: "pcmc_session",
